@@ -1,0 +1,3 @@
+ALTER TABLE "Conversation"
+ADD COLUMN IF NOT EXISTS "hiddenForParticipantOne" BOOLEAN NOT NULL DEFAULT false,
+ADD COLUMN IF NOT EXISTS "hiddenForParticipantTwo" BOOLEAN NOT NULL DEFAULT false;

@@ -1,0 +1,185 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id               String          @id @default(cuid())
+  fullName         String
+  email            String          @unique
+  passwordHash     String
+  role             String          @default("student")
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  studentProfile   StudentProfile?
+  skillPosts       SkillPost[]
+  requestedBookings Booking[]      @relation("RequesterBookings")
+  providedBookings  Booking[]      @relation("ProviderBookings")
+  notifications    Notification[]
+  conversationsAsParticipantOne Conversation[] @relation("ConversationParticipantOne")
+  conversationsAsParticipantTwo Conversation[] @relation("ConversationParticipantTwo")
+  sentMessages     Message[]
+}
+
+model StudentProfile {
+  id                   String               @id @default(cuid())
+  userId               String               @unique
+  username             String               @unique
+  university           String
+  major                String
+  year                 Int
+  bio                  String
+  location             String
+  preferredSessionMode PreferredSessionMode
+  avatarUrl            String?
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+  user                 User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([university])
+  @@index([major])
+  @@index([username])
+}
+
+enum PreferredSessionMode {
+  online
+  in_person
+  both
+}
+
+model SkillPost {
+  id            String               @id @default(cuid())
+  userId        String
+  type          PostType
+  title         String
+  description   String
+  skillName     String
+  preferredMode PreferredSessionMode
+  status        PostStatus           @default(open)
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+  user          User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bookings      Booking[]
+
+  @@index([userId])
+  @@index([type])
+  @@index([status])
+  @@index([createdAt])
+}
+
+enum PostType {
+  offer
+  request
+}
+
+enum PostStatus {
+  open
+  closed
+}
+
+model Booking {
+  id              String        @id @default(cuid())
+  postId          String
+  requesterId     String
+  providerId      String
+  message         String
+  proposedDate    DateTime
+  durationMinutes Int
+  sessionMode     PreferredSessionMode
+  meetingLocation String?
+  meetingLink     String?
+  status          BookingStatus @default(pending)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  post            SkillPost     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  requester       User          @relation("RequesterBookings", fields: [requesterId], references: [id], onDelete: Cascade)
+  provider        User          @relation("ProviderBookings", fields: [providerId], references: [id], onDelete: Cascade)
+  conversation    Conversation?
+
+  @@index([postId])
+  @@index([requesterId])
+  @@index([providerId])
+  @@index([status])
+  @@index([proposedDate])
+  @@index([sessionMode])
+}
+
+model Conversation {
+  id               String   @id @default(cuid())
+  bookingId        String   @unique
+  participantOneId String
+  participantTwoId String
+  hiddenForParticipantOne Boolean @default(false)
+  hiddenForParticipantTwo Boolean @default(false)
+  participantOneClearedAt DateTime?
+  participantTwoClearedAt DateTime?
+  createdAt        DateTime @default(now())
+  booking          Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  participantOne   User     @relation("ConversationParticipantOne", fields: [participantOneId], references: [id], onDelete: Cascade)
+  participantTwo   User     @relation("ConversationParticipantTwo", fields: [participantTwoId], references: [id], onDelete: Cascade)
+  messages         Message[]
+
+  @@index([participantOneId, createdAt])
+  @@index([participantTwoId, createdAt])
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  conversationId String
+  senderId       String
+  content        String
+  isRead         Boolean      @default(false)
+  createdAt      DateTime     @default(now())
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender         User         @relation(fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
+  @@index([senderId, createdAt])
+  @@index([conversationId, isRead])
+}
+
+enum BookingStatus {
+  pending
+  accepted
+  rejected
+  cancelled
+  completed
+}
+
+model Notification {
+  id                String            @id @default(cuid())
+  userId            String
+  type              NotificationType
+  title             String
+  message           String
+  isRead            Boolean           @default(false)
+  relatedEntityType RelatedEntityType?
+  relatedEntityId   String?
+  createdAt         DateTime          @default(now())
+  user              User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead, createdAt])
+  @@index([userId, createdAt])
+  @@index([relatedEntityType, relatedEntityId])
+}
+
+enum NotificationType {
+  booking_request_received
+  booking_accepted
+  booking_rejected
+  booking_cancelled
+  booking_completed
+  new_review_received
+  new_message
+}
+
+enum RelatedEntityType {
+  booking
+  post
+  review
+  conversation
+}
